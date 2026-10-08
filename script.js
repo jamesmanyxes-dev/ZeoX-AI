@@ -3,7 +3,7 @@
 
 import { ZOE_SYSTEM_PROMPT, OPENING_LINE } from './persona.js';
 
-const STORE_KEY = "zeox.conversation.v1";
+const STORE_KEY = "zeox.conversation.v2";
 let history = loadHistory();
 let isTyping = false;
 
@@ -15,7 +15,10 @@ let   welcomeEl  = document.getElementById("welcome");
 function loadHistory() {
   try {
     const arr = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
-    return Array.isArray(arr) ? arr.filter(m => m && m.role && m.content) : [];
+    const glitchy = t => /wifi just died|say that again|glitch on my end|connections are all acting up/i.test(t);
+    return Array.isArray(arr)
+      ? arr.filter(m => m && m.role && m.content && !glitchy(m.content))
+      : [];
   } catch { return []; }
 }
 function saveHistory() {
@@ -60,7 +63,11 @@ async function streamZoeReply(onToken) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       stream: true,
-      messages: [{ role: "system", content: ZOE_SYSTEM_PROMPT }, ...history]
+      // send only role/content — extra fields (like ts) make some providers 400
+      messages: [
+        { role: "system", content: ZOE_SYSTEM_PROMPT },
+        ...history.map(m => ({ role: m.role, content: m.content }))
+      ]
     })
   });
   if (!res.ok) {
